@@ -11,8 +11,10 @@ export default () => {
 
   const handleQuestionSubmit = async () => {
     try {
-      const response = await axios.post("/api/answer", { question });
-      setAnswer(response.data.answer);
+      const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+      axios.defaults.headers.common['X-CSRF-Token'] = csrfToken;
+      const response = await axios.post("/answers", { question });
+      setAnswer(response.data.answer.choices[0].message.content);
     } catch (error) {
       console.log(error);
       setAnswer("Error getting answer");

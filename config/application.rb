@@ -18,5 +18,9 @@ module Pagepilot
     #
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
+      Pinecone.configure do |config|
+        config.api_key  = ENV['PINECONE_API_KEY']
+        config.environment = ENV['PINECONE_ENVIRONMENT']
+      end
   end
 end

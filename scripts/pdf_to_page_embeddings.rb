@@ -67,7 +67,7 @@ def get_embedding(text, model)
 end
 
 def get_query_embedding(text)
-    return get_query_embedding(text, QUERY_EMBEDDINGS_MODEL)
+    return get_embedding(text, QUERY_EMBEDDINGS_MODEL)
 end
 
 def get_doc_embedding(text)
