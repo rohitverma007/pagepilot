@@ -1,13 +1,33 @@
+# usage:
+# ruby scripts/pdf_to_page_embeddings.rb pdf_file_location/filename.pdf
+# example:
+# ruby scripts/pdf_to_page_embeddings.rb ../../Downloads/the-time-machine.pdf
+# Required KEYS:
+# ENV["OPEN_API_KEY"]
+# ENV["MONGO_URI"]
+# ENV['PINECONE_API_KEY']
+# ENV['PINECONE_ENVIRONMENT']
 
 require 'openai'
 require 'tokenizers'
 require "pdf-reader"
-require 'polars-df'
-require 'CSV'
+require 'mongo'
+require 'pinecone'
 
-@client = OpenAI::Client.new(access_token: ENV["OPEN_API_KEY"])
+@openai_client = OpenAI::Client.new(access_token: ENV["OPEN_API_KEY"])
+mongo_uri = ENV["MONGO_URI"]
+options = { server_api: {version: "1"} }
+@mongo_client = Mongo::Client.new(mongo_uri, options)
+
+Pinecone.configure do |config|
+    config.api_key  = ENV['PINECONE_API_KEY']
+    config.environment = ENV['PINECONE_ENVIRONMENT']
+end
+@pinecone = Pinecone::Client.new
+
 
 DOC_EMBEDDINGS_MODEL = "text-search-curie-doc-001"
+QUERY_EMBEDDINGS_MODEL = "text-search-curie-query-001"
 
 @tokenizer = Tokenizers.from_pretrained("gpt2")
 
@@ -18,42 +38,36 @@ end
 def extract_pages(page_text, index)
     output = []
     if page_text.length() == 0
-        return []
+        return nil
     end
-
     content = page_text.split().join(" ")
-    puts "page text:"+content
     if (count_tokens(content)+4 < 2046)
-        single_page = [
-            "Page " + index.to_s,
-            content,
-            count_tokens(content)+4
-        ]
-        return single_page
+        return content
     else 
-        return []
+        return nil
     end
 end
-
-pdf_filename = ARGV[0]
 
 reader = PDF::Reader.new(ARGV[0])
 
 res = []
 i = 1
 reader.pages.each_with_index do |page, index|
-    single_page_result = extract_pages(page.text, index+1)
-    res.append(single_page_result)
-    i = i +1    
+    single_page_content = extract_pages(page.text, index+1)
+    res.push(single_page_content)
 end
 
 def get_embedding(text, model)
-    result = @client.embeddings(
+    result = @openai_client.embeddings(
         parameters: {
-            model: DOC_EMBEDDINGS_MODEL,
+            model: model,
             input: text
     })
     return result["data"][0]["embedding"]
+end
+
+def get_query_embedding(text)
+    return get_query_embedding(text, QUERY_EMBEDDINGS_MODEL)
 end
 
 def get_doc_embedding(text)
@@ -61,26 +75,36 @@ def get_doc_embedding(text)
 end
 
 def compute_doc_embeddings(res)
-    data = []
     res.each_with_index do |singlepage, index|
-        data.push(get_doc_embedding(singlepage[1]).insert(0, "Page "+(index+1).to_s))
+        singlepage_embedding = get_doc_embedding(singlepage)
+        mongo_doc = {
+            title: 'the-time-machine',
+            page_index: index,
+            content: singlepage
+        }
+        books_collection = @mongo_client[:books]
+        insert_to_mongo = books_collection.insert_one(mongo_doc)
+        inserted_mongo_id = insert_to_mongo.inserted_id.to_s
+        puts inserted_mongo_id
+        pinecone_index = @pinecone.index("pagepilot")
+        upserted_result = pinecone_index.upsert(
+            vectors: [{
+                id: inserted_mongo_id,
+                metadata: {
+                    title: 'the-time-machine',
+                    page_index: index
+                },
+                values: singlepage_embedding
+            }]
+        )
+        puts upserted_result
     end
-    return data
 end
 
 doc_embeddings = compute_doc_embeddings(res)
-CSV.open(pdf_filename+".embeddings.csv", "w") do |csv|
-    num_array = ["title"]
-    i = 0
-    4096.times do
-        num_array << i
-        i = i + 1
-    end
-    csv << num_array
-    doc_embeddings.each { |row| csv << row }
-end
 
-CSV.open(pdf_filename+".pages.csv", "w") do |csv|
-    csv << ["title", "content", "tokens"]
-    res.each { |row| csv << row }
-end
+# To query:
+# text = "During dinner, what does the Time Traveller make disappear?"
+# query_embedding = get_query_embedding(text)
+# results = pinecone_index.query(vector: query_embedding)
+# query mongodb with ids results
