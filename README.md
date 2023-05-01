@@ -1,24 +1,5 @@
-# README
+# PagePilot
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+Navigate your PDFs like a pro! Our AI-powered app makes parsing and finding information in PDFs easier than ever before.
 
-Things you may want to cover:
-
-* Ruby version
-
-* System dependencies
-
-* Configuration
-
-* Database creation
-
-* Database initialization
-
-* How to run the test suite
-
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+[Heroku Link](https://pagepilot.herokuapp.com/)
