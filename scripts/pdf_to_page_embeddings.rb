@@ -1,7 +1,7 @@
 # usage:
 # ruby scripts/pdf_to_page_embeddings.rb pdf_file_location/filename.pdf
 # example:
-# ruby scripts/pdf_to_page_embeddings.rb ../../Downloads/the-time-machine.pdf
+# ruby scripts/pdf_to_page_embeddings.rb ../../Downloads/the-minimalist-entrepeneur-v1.pdf
 # Required KEYS:
 # ENV["OPEN_API_KEY"]
 # ENV["MONGO_URI"]
@@ -42,7 +42,7 @@ def extract_pages(page_text, index)
     end
     content = page_text.split().join(" ")
     if (count_tokens(content)+4 < 2046)
-        return content
+        return content, (count_tokens(content)+4)
     else 
         return nil
     end
@@ -76,11 +76,12 @@ end
 
 def compute_doc_embeddings(res)
     res.each_with_index do |singlepage, index|
-        singlepage_embedding = get_doc_embedding(singlepage)
+        singlepage_embedding = get_doc_embedding(singlepage[0])
         mongo_doc = {
-            title: 'the-time-machine',
+            title: 'the-minimalist-entrepeneur-v1',
             page_index: index,
-            content: singlepage
+            tokens: singlepage[1],
+            content: singlepage[0]
         }
         books_collection = @mongo_client[:books]
         insert_to_mongo = books_collection.insert_one(mongo_doc)
@@ -91,7 +92,7 @@ def compute_doc_embeddings(res)
             vectors: [{
                 id: inserted_mongo_id,
                 metadata: {
-                    title: 'the-time-machine',
+                    title: 'the-minimalist-entrepeneur-v1',
                     page_index: index
                 },
                 values: singlepage_embedding

@@ -14,7 +14,7 @@ export default () => {
       const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
       axios.defaults.headers.common['X-CSRF-Token'] = csrfToken;
       const response = await axios.post("/answers", { question });
-      setAnswer(response.data.answer.choices[0].message.content);
+      setAnswer(response.data.answer);
     } catch (error) {
       console.log(error);
       setAnswer("Error getting answer");
